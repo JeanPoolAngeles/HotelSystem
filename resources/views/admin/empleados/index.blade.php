@@ -1,0 +1,149 @@
+@extends('template')
+
+@section('title', 'VISTA-EMPLEADOS')
+
+@section('content')
+    <div class="card mt-4">
+        <div class="card-body text-center">
+            <h1>ADMINISTRACIÓN DE LOS EMPLEADOS</h1>
+        </div>
+    </div>
+    <div class="card mt-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-sm-12">
+                    <div class="mb-2 btn-group" role="group" aria-label="Button group">
+                        @can('admin.empleados.create')
+                            <a href="{{ route('admin.empleados.create') }}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-plus"></i>
+                            </a>
+                        @endcan
+                        @can('admin.empleados.reportes')
+                            <a href="{{ route('admin.empleados.pdf') }}" target="_blank" class="btn btn-danger btn-sm">
+                                <i class="fas fa-file-pdf"></i>
+                            </a>
+                            <a href="{{ route('admin.empleados.excel') }}" class="btn btn-success btn-sm">
+                                <i class="fas fa-file-excel"></i>
+                            </a>
+                        @endcan
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            @if ($message = Session::get('success'))
+                                <div class="alert alert-success" role="alert">
+                                    {{ $message }}
+                                </div>
+                            @endif
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover display responsive nowrap" width="100%"
+                                    id="tblEmpleado">
+                                    <thead class="thead">
+                                        <tr>
+                                            <th></th>
+                                            <th>DNI</th>
+                                            <th>Nombre</th>
+                                            <th>Teléfono</th>
+                                            <th>Tipo</th>
+                                            <th>Sueldo</th>
+                                            <th>Correo</th>
+                                            <th>Dirección</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <form id="deleteForm" action="#" method="post">
+        @csrf
+        @method('DELETE')
+    </form>
+@endsection
+
+@section('css')
+    <link href="DataTables/datatables.min.css" rel="stylesheet">
+@endsection
+
+@section('js')
+    <script src="DataTables/datatables.min.js"></script>
+    <script>
+        var editUrl = "{{ route('admin.empleados.edit', ['empleado' => ':empleado']) }}";
+        var deleteUrl = "{{ route('admin.empleados.destroy', ['empleado' => ':empleado']) }}";
+        document.addEventListener("DOMContentLoaded", function() {
+            new DataTable('#tblEmpleado', {
+                responsive: true,
+                fixedHeader: true,
+                ajax: {
+                    url: '{{ route('admin.empleado.list') }}',
+                    dataSrc: 'data'
+                },
+                columns: [{
+                        data: 'id'
+                    },
+                    {
+                        data: 'dni'
+                    },
+                    {
+                        data: 'nombre'
+                    },
+                    {
+                        data: 'telefono'
+                    },
+                    {
+                        data: 'tipo'
+                    },
+                    {	
+                        data: 'sueldo'
+                    },
+                    {
+                        data: 'correo'
+                    },
+                    {
+                        data: 'direccion'
+                    },
+                    {
+                        // Agregar columna para acciones
+                        data: null,
+                        render: function(data, type, row) {
+                            // Agregar botones de editar y eliminar
+                            return `<a class="btn btn-sm btn-primary" href="${editUrl.replace(':cliente', row.id)}"><i class="fas fa-edit"></i></a>` +
+                                '<button class="btn btn-sm btn-danger" onclick="deleteClient(' +
+                                row.id + ')"><i class="fas fa-trash"></i></button>';
+                        }
+                    }
+                ],
+                language: {
+                    url: 'https://cdn.datatables.net/plug-ins/2.0.3/i18n/es-ES.json',
+                },
+                order: [
+                    [0, 'asc']
+                ]
+            });
+        });
+
+        // Función para eliminar un cliente
+        function deleteClient(clientId) {
+            Swal.fire({
+                title: "Eliminar",
+                text: "¿Estás seguro de que quieres eliminar este cliente?",
+                icon: "info",
+                showCancelButton: true,
+                confirmButtonColor: "#3085d6",
+                cancelButtonColor: "#d33",
+                confirmButtonText: "Si, eliminar!"
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    var form = document.querySelector('#deleteForm');
+                    form.action = deleteUrl.replace(':empleado', clientId);
+                    // Enviar el formulario
+                    form.submit();
+                }
+            });
+        }
+    </script>
+@stop

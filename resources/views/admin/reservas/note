@@ -1,0 +1,252 @@
+
+<!-- @extends('template')
+
+@section('title', 'ADMIN-RESERVAS')
+
+@section('content')
+    <div class="card">
+        <div class="card-body text-center">
+            <h1>ADMINISTRACIÓN DE NUEVAS RESERVAS</h1>
+        </div>
+    </div>
+    @if (session('success'))
+        <script>
+            let message = "{{ session('success') }}"
+            Swal.fire({
+                position: "top-end",
+                icon: "success",
+                title: message,
+                showConfirmButton: false,
+                timer: 1200
+            });
+        </script>
+    @endif
+    <div class="card mt-1">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-sm-12">
+                    @can('admin.cajas.index')
+                        <div class="mb-1">
+                            <a href="{{ route('admin.cajas.index') }}" class="btn btn-info btn-sm">
+                                <i class="fas fa-funnel-dollar"></i> {{ __('Caja') }}
+                            </a>
+                            <a href="{{ route('admin.reservas.show') }}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-list"></i> {{ __('Listar reservass') }}
+                            </a>
+                        </div>
+                    @endcan
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="card-body col-mb-3">
+                                    <!-- aqui para que se listen por livewire los servicios y habitaciones disponibles.... -->
+                                    @livewire('habitaciones-disponibles')
+
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer d-flex justify-content-end gap-2">
+                            <button class="btn btn-primary fixed-button mt-4" id="btnReservar" type="button">Generar
+                                Reserva</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" tabindex="-1" role="dialog" id="modalreservas">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div class="modal-title">
+                                <h3>Total: <span id="total_pagar">0.00</span></h3>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label>reservas Rapida*<span class="text-danger">*</span></label>
+                            <div class="row">
+                                <div class="col-md-8 mb-2">
+                                    <div class="input-group">
+                                        <input id="buscarCliente" class="form-control" type="text"
+                                            placeholder="Nombre del cliente" value="{{ $cliente->nombre ?? '' }}" readonly>
+                                        <input id="id_cliente" class="form-control" type="hidden"
+                                            value="{{ $cliente->id ?? '' }}">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text bg-primary"><i class="fas fa-search"></i></span>
+                                        </div>
+                                    </div>
+                                    <span id="errorBusqueda" class="text-danger"></span>
+                                </div>
+                                <div class="col-md-12">
+                                    <hr>
+                                </div>
+
+                                <div class="form-group col-md-6">
+                                    <label for="forma">Forma Pago <span class="text-danger">*</span></label>
+                                    <select id="forma" class="form-control">
+                                        @foreach ($formapagos as $formapago)
+                                            <option value="{{ $formapago->id }}">{{ $formapago->nombre }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="form-group col-md-6">
+                                    <label for="pago_con">Pago con</label>
+                                    <input id="pago_con" class="form-control" type="number" step="0.01" min="0.01"
+                                        placeholder="0.00" oninput="calcularCambio()">
+                                </div>
+
+                                <div class="form-group col-md-6">
+                                    <label for="cambio">Cambio</label>
+                                    <input id="cambio" class="form-control" type="text" placeholder="0.00" disabled>
+                                </div>
+                            </div>
+                            <!-- Campos ocultos para datos -->
+                            <input id="id_venta" type="hidden" name="id_venta" value="">
+                            <input id="id_servicio" type="hidden" name="id_servicio" value="">
+                            <input id="id_habitacion" type="hidden" name="id_habitacion" value="">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('css')
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css" />
+    <link rel="stylesheet" href="{{ asset('assets/css/custom.css') }}">
+@endsection
+
+@section('js')
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+
+    <script>
+        var reservaUrl = "{{ route('admin.reservas.index') }}";
+        var ticketUrl = "{{ route('admin.reservas.ticket', ['id' => ':reserva']) }}";
+
+
+        const btnReservar = document.querySelector('#btnReservar');
+        const btnProcesar = document.querySelector('#btnProcesar');
+        const total_pagar = document.querySelector('#total_pagar');
+        const pago_con = document.querySelector('#pago_con');
+        const total = document.querySelector('#total');
+        const tiporeservas = document.querySelector('#tipo_reservas');
+
+        const pagoCon = document.querySelector('#pago_con'); // El campo Pago con
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const idCliente = document.getElementById('id_cliente');
+            const idHabitacion = document.getElementById('id_habitacion');
+            const idProducto = document.getElementById('id_producto');
+            const idVenta = document.getElementById('id_venta');
+            const total = document.getElementById('total');
+            const pagoCon = document.getElementById('pago_con');
+            const formaPago = document.getElementById('forma');
+
+            if (!btnReservar || !idCliente || !idHabitacion || !idProducto || !idVenta || !total || !pagoCon || !
+                formaPago) {
+                console.error('Uno o más elementos no están presentes en el DOM.');
+                return;
+            } else {
+                Livewire.on('habitacionSeleccionada', idHabitacion => {
+                    document.getElementById('id_habitacion').value = idHabitacion;
+                    console.log("Habitación seleccionada: " + idHabitacion);
+                });
+            }
+
+            btnReservar.addEventListener('click', function() {
+                total_pagar.textContent = total.value;
+                $('#modalreservas').modal('show');
+            });
+
+            btnProcesar.addEventListener('click', function() {
+                // Validación inicial de campos requeridos
+                if (!id_cliente.value || !forma.value) {
+                    mostrarAlerta('TODOS LOS CAMPOS CON * SON REQUERIDOS', 'warning');
+                    return;
+                }
+
+                const montoPago = parseFloat(pago_con.value.replace(',', '')) || 0;
+                const totalPagar = parseFloat(total_pagar.textContent.replace(',', '')) || 0;
+
+                Swal.fire({
+                    title: "Mensaje",
+                    text: "¿Está seguro de procesar la reservas?",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonColor: "#3085d6",
+                    cancelButtonColor: "#d33",
+                    confirmButtonText: "Sí, procesar"
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Realizar la petición POST al backend
+                        fetch(reservasUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    id_cliente: id_cliente.value,
+                                    forma: forma.value,
+                                    pago_con: montoPago,
+                                    tipo_reservas: tipo_reservas.value,
+                                    id_sala: id_sala.value,
+                                    id_empleado: id_empleado.value,
+                                    numero_mesa: numero_mesa.value
+                                })
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                mostrarAlerta(data.title, data.icon);
+
+                                if (data.icon === 'success') {
+                                    if (!pago_con.value) {
+                                        mostrarAlerta('EL MONTO DE PAGO ES REQUERIDO',
+                                            'warning');
+                                        return;
+                                    }
+                                    const ticketUrlFinal = ticketUrl.replace(':reservas', data
+                                        .ticket);
+                                    window.open(ticketUrlFinal, '_blank'); // Abrir ticket
+                                    window.location.reload(); // Recargar página
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error al procesar la reservas: ', error);
+                                mostrarAlerta(
+                                    'Ocurrió un error al procesar la reservas. Intente nuevamente.',
+                                    'error');
+                            });
+                    }
+                });
+            });
+        });
+
+        function calcularCambio() {
+            var pagoCon = parseFloat(pago_con.value.replace(',', '')) || 0; // Reemplaza comas por puntos
+            var totalreservas = parseFloat(total.value.replace(',', '')) || 0;
+
+            if (!isNaN(pagoCon) && !isNaN(totalreservas)) {
+                var cambio = pagoCon - totalreservas;
+                document.getElementById('cambio').value = cambio.toFixed(2);
+            } else {
+                document.getElementById('cambio').value = '0.00';
+            }
+        }
+
+        function mostrarAlerta(texto, icono) {
+            Swal.fire({
+                showConfirmButton: false,
+                title: "Respuesta",
+                text: texto,
+                icon: icono,
+                toast: true,
+                timer: 1500,
+                position: "top-end",
+            });
+        }
+    </script>
+@stop
+*/
